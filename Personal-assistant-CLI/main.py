@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from collections import UserDict
 from datetime import datetime
 import pickle
@@ -50,6 +51,23 @@ class Phone(Field):
     @staticmethod
     def validate_phone(phone):
         return len(phone) == 10 and phone.isdigit()
+
+
+class Birthday(Field):
+    def __init__(self, value):
+        super().__init__(value)
+        self.value = value
+
+    @Field.value.setter
+    def value(self, new_value):
+        try:
+            datetime.strptime(new_value, "%Y-%m-%d")
+            self._value = new_value
+        except ValueError:
+            raise ValueError("Invalid birthday format. Use 'YYYY-MM-DD'.")
+
+    def __str__(self):
+        return f"Birthday: {self.value}"
 
 
 class Note(Field):
@@ -175,23 +193,6 @@ class Record:
                 f"phones: {phones_info}{email_info}{address_info}{birthday_info}{note_info}")
 
 
-class Birthday(Field):
-    def __init__(self, value):
-        super().__init__(value)
-        self.value = value
-
-    @Field.value.setter
-    def value(self, new_value):
-        try:
-            datetime.strptime(new_value, "%Y-%m-%d")
-            self._value = new_value
-        except ValueError:
-            raise ValueError("Invalid birthday format. Use 'YYYY-MM-DD'.")
-
-    def __str__(self):
-        return f"Birthday: {self.value}"
-
-
 class AddressBook(UserDict):
 
     def __iter__(self, chunk_size=1):
@@ -289,6 +290,102 @@ class AddressBook(UserDict):
         return results
 
 
+class UserInterface(ABC):
+
+    @abstractmethod
+    def display_contacts(self, contacts):
+        pass
+
+    @abstractmethod
+    def add_phone(self, contact):
+        pass
+
+    @abstractmethod
+    def print_contact_info(name):
+        pass
+
+    @abstractmethod
+    def change_handler(name, new_number):
+        pass
+
+    @abstractmethod
+    def phone_handler(name):
+        pass
+
+    @abstractmethod
+    def add_email_handler(name, email):
+        pass
+
+    @abstractmethod
+    def add_address_handler(name, address):
+        pass
+
+    @abstractmethod
+    def load():
+        pass
+
+
+class ConsoleUserInterface(UserInterface):
+
+    def display_contacts(name):
+        record = Record(name)
+        address_book.add_record(record)
+        address_book.save_to_file("address_book.pkl")
+        return f"Contact {name} added"
+
+    def add_phone(name, phone):
+        record = address_book.find(name)
+        record.add_phone(phone)
+        address_book.add_record(record)
+        address_book.save_to_file("address_book.pkl")
+        return f"Contact {name} Add phone:{phone}"
+
+    def change_handler(name, new_number):
+        record = address_book.find(name)
+        if record:
+            record.phones = []
+            record.add_phone(new_number)
+            address_book.save_to_file("address_book.pkl")
+            return f"Change name:{name}, phone number:{new_number}"
+
+    def phone_handler(name):
+        record = address_book.find(name)
+        if record:
+            return f"Phone number: {record.phones[0].value}" if record.phones else f"No phone number for {name}"
+
+    def add_email_handler(name, email):
+        record = address_book.find(name)
+        if record:
+            try:
+                record.add_email(email)
+                address_book.save_to_file("address_book.pkl")
+                return f"Email added to contact {name}"
+            except ValueError as e:
+                return f"Error: {e}"
+        else:
+            return f"Contact {name} not found"
+
+    def add_address_handler(name, address):
+        record = address_book.find(name)
+        if record:
+            record.add_address(address)
+            address_book.save_to_file("address_book.pkl")
+            return f"Address added to contact {name}"
+        else:
+            return f"Contact {name} not found"
+
+    def print_contact_info(name):
+        record = address_book.find(name)
+        if record:
+            print(record)
+        else:
+            print(f"Contact {name} not found")
+
+    def load():
+        address_book.load_from_file('address_book.pkl')
+        return address_book
+
+
 def input_error(*type_args):
     def args_parser(func):
         def wrapper(args):
@@ -322,72 +419,6 @@ def input_error(*type_args):
         return wrapper
 
     return args_parser
-
-
-def add_contact(name):
-    record = Record(name)
-    address_book.add_record(record)
-    address_book.save_to_file("address_book.pkl")
-    return f"Contact {name} added"
-
-
-def add_phone(name, phone):
-    record = address_book.find(name)
-    record.add_phone(phone)
-    address_book.add_record(record)
-    address_book.save_to_file("address_book.pkl")
-    return f"Contact {name} Add phone:{phone}"
-
-
-def change_handler(name, new_number):
-    record = address_book.find(name)
-    if record:
-        record.phones = []
-        record.add_phone(new_number)
-        address_book.save_to_file("address_book.pkl")
-        return f"Change name:{name}, phone number:{new_number}"
-
-
-def phone_handler(name):
-    record = address_book.find(name)
-    if record:
-        return f"Phone number: {record.phones[0].value}" if record.phones else f"No phone number for {name}"
-
-
-def add_email_handler(name, email):
-    record = address_book.find(name)
-    if record:
-        try:
-            record.add_email(email)
-            address_book.save_to_file("address_book.pkl")
-            return f"Email added to contact {name}"
-        except ValueError as e:
-            return f"Error: {e}"
-    else:
-        return f"Contact {name} not found"
-
-
-def add_address_handler(name, address):
-    record = address_book.find(name)
-    if record:
-        record.add_address(address)
-        address_book.save_to_file("address_book.pkl")
-        return f"Address added to contact {name}"
-    else:
-        return f"Contact {name} not found"
-
-
-def print_contact_info(name):
-    record = address_book.find(name)
-    if record:
-        print(record)
-    else:
-        print(f"Contact {name} not found")
-
-
-def load():
-    address_book.load_from_file('address_book.pkl')
-    return address_book
 
 
 def main():
@@ -429,15 +460,14 @@ address_book = AddressBook()
 
 Commands = {
     "sort": clean,
-    "load": load,
-    "add": add_contact,  # создание нового контакта работает
-    "add_phone": add_phone,  # добавление номера к контакту работает
-    "change": change_handler,  # редактирование
-    "phone": phone_handler,  # поиск номера по имени работает
-    "add_email": add_email_handler,  # добавление email к контакту работает
-    "add_address": add_address_handler,  # добавление адресса к контакту работает
-    "info": print_contact_info  # информация о контакте работает
-
+    "load": ConsoleUserInterface.load,
+    "add": ConsoleUserInterface.display_contacts,  # создание нового контакта работает
+    "add_phone": ConsoleUserInterface.add_phone,  # добавление номера к контакту работает
+    "change": ConsoleUserInterface.change_handler,  # редактирование
+    "phone": ConsoleUserInterface.phone_handler,  # поиск номера по имени работает
+    "add_email": ConsoleUserInterface.add_email_handler,  # добавление email к контакту работает
+    "add_address": ConsoleUserInterface.add_address_handler,  # добавление адресса к контакту работает
+    "info": ConsoleUserInterface.print_contact_info  # информация о контакте работает
 
 }
 
