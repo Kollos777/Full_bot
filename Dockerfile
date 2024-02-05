@@ -1,5 +1,4 @@
 FROM python:3.10
-ENV APP_HOME /main
-WORKDIR $APP_HOME
+WORKDIR /app
 EXPOSE 5000
-ENTRYPOINT ["python", "main.py"]
+ENTRYPOINT ["python", "personal_assistant.main"]
